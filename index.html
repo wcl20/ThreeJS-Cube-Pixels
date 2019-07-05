@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Page Title</title>
+<style>
+    body { margin: 0; }
+    canvas { width: 100%; height: 100% }
+</style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script src="js/three.min.js"></script>
+    <script src="js/pixel.js"></script>
+    <script>
+        let scene, camera, renderer;
+        // To update camera position
+        let cameraAngle = 0, cameraRadius = 0;
+        let pixels = [];
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        const image = document.createElement("img");
+        image.onload = init;
+        image.src = "img/image.png";
+        
+        function init() {
+
+            // Set up scene
+            scene = new THREE.Scene();
+
+            // Set up camera
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+
+            createPixels();
+
+            // Set up renderer
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById("canvas"),
+                antialias: true
+            });
+			renderer.setSize(width, height);
+			
+            // Set up Listeners
+            window.addEventListener("resize", onResize, false);
+
+            // Run animation loop
+            animate();
+        }
+
+        /****************************************************************************************************
+         * Object Functions
+         ****************************************************************************************************/
+        
+        function createPixels() {
+            // Get image data
+            const imageData = getImageData(image);
+
+            // Create a map to map rgb values to THREEjs material    
+            const materialMap = new Map();
+            
+            /*
+             * Every 4 elements in the array represents a pixel rgba value
+             * Image data returns each pixel from left to right, top to bottom
+            */
+            for(let i = 0; i < imageData.data.length; i += 4) {
+                // Get rgb values from image data
+                let r = imageData.data[i], g = imageData.data[i + 1], b = imageData.data[i + 2];
+
+                // Ignore black pixels
+                if(r != 0 && g != 0 && b != 0) {
+
+                    // Get material from material map
+                    let material = materialMap.get(`${r}-${g}-${b}`);
+                    if(material === undefined) {
+                        let color = new THREE.Color(`rgb(${r}, ${g}, ${b})`);
+                        material = new THREE.MeshBasicMaterial({ color: color });
+                        materialMap.set(`${r}-${g}-${b}`, material);
+                    }
+
+                    // Calculate pixel destination
+                    let x = (i / 4) % imageData.width - imageData.width / 2;
+                    let y = -Math.floor((i / 4) / imageData.width) + imageData.height / 2;
+                    let destination = {x: x, y: y, z: 0};
+
+                    // Create a pixel
+                    let pixel = new Pixel(material, destination);
+                    pixels.push(pixel);
+                    scene.add(pixel.mesh);
+                }
+            }
+        }
+
+        /****************************************************************************************************
+         * Animation Loop Function
+         ****************************************************************************************************/
+        function animate() {
+
+            pixels.forEach(p => p.update());
+            
+            // Rotate Camera
+            camera.position.x = cameraRadius * Math.cos(cameraAngle);
+            camera.position.z = cameraRadius * Math.sin(cameraAngle);
+            camera.lookAt(0, 0, 0);
+            cameraAngle += 0.02;
+            if(cameraRadius < 200) cameraRadius += 1
+
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+		/****************************************************************************************************
+         * Event Handlers
+         ****************************************************************************************************/
+         function onResize() {
+			width = window.innerWidth;
+			height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+			renderer.setSize(width, height);
+		}
+
+        /****************************************************************************************************
+         * Helper Functions
+         ****************************************************************************************************/
+		
+        // Returns the image data of a HTML image 
+        function getImageData(image) {
+            const canvas = document.createElement("canvas");
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0);
+            return context.getImageData(0, 0, canvas.width, canvas.height);
+        }
+        
+
+    </script>
+</body>
+</html>
